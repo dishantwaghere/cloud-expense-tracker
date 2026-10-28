@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud Expense Tracker</title>
+  <style>
+    :root { --ink:#172033; --muted:#68758a; --blue:#3156d9; --line:#e7ebf2; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,Arial,sans-serif; background:#f4f6fb; color:var(--ink); }
+    header { background:linear-gradient(120deg,#263f9e,#5577ef); color:white; padding:26px 20px; }
+    header .inner, main { max-width:1000px; margin:auto; }
+    header h1 { margin:0 0 7px; font-size:28px; }
+    header p { margin:0; opacity:.9; }
+    main { padding:24px 16px 40px; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:18px; }
+    .card { background:white; border:1px solid var(--line); border-radius:14px; padding:20px; box-shadow:0 5px 18px #17203308; }
+    .stat-label { color:var(--muted); font-size:13px; }
+    .stat-value { font-size:27px; font-weight:750; margin-top:8px; }
+    .columns { display:grid; grid-template-columns:minmax(260px, .8fr) minmax(320px,1.2fr); gap:18px; align-items:start; }
+    h2 { margin:0 0 16px; font-size:18px; }
+    label { display:block; font-size:13px; font-weight:650; margin:12px 0 6px; }
+    input,select { width:100%; border:1px solid #dce2ed; border-radius:8px; padding:11px; font:inherit; background:white; }
+    button { border:0; border-radius:8px; padding:10px 13px; font:inherit; font-weight:650; cursor:pointer; }
+    .primary { background:var(--blue); color:white; width:100%; margin-top:16px; }
+    .delete { color:#b42335; background:#fff0f1; padding:7px 10px; font-size:12px; }
+    .flash { background:#e9f8ee; border:1px solid #c8eed4; padding:10px 12px; border-radius:8px; margin-bottom:14px; font-size:14px; }
+    .expense { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 0; border-top:1px solid var(--line); }
+    .expense-title { font-weight:700; overflow-wrap:anywhere; }
+    .meta { color:var(--muted); font-size:12px; margin-top:5px; }
+    .right { display:flex; align-items:center; gap:12px; white-space:nowrap; }
+    .amount { font-weight:750; }
+    .pill { background:#eef2ff; color:#3449a8; border-radius:20px; padding:4px 8px; font-size:11px; }
+    .empty { padding:20px 0; color:var(--muted); font-size:14px; }
+    .category-row { display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid var(--line); font-size:14px; }
+    footer { text-align:center; padding:0 16px 26px; color:var(--muted); font-size:12px; }
+    @media(max-width:720px){ .columns{grid-template-columns:1fr;} .expense{align-items:flex-start;} .right{flex-direction:column; align-items:flex-end; gap:7px;} }
+  </style>
+</head>
+<body>
+<header>
+  <div class="inner">
+    <h1>☁️ Cloud Expense Tracker</h1>
+    <p>Track spending, understand categories, and manage expenses in one place.</p>
+  </div>
+</header>
+<main>
+  {% with messages = get_flashed_messages() %}
+    {% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}
+  {% endwith %}
+  <section class="stats">
+    <div class="card"><div class="stat-label">Total expenses</div><div class="stat-value">₹{{ "%.2f"|format(total) }}</div></div>
+    <div class="card"><div class="stat-label">Transactions</div><div class="stat-value">{{ expenses|length }}</div></div>
+    <div class="card"><div class="stat-label">Top spending category</div><div class="stat-value" style="font-size:21px">{{ category_rows[0]["category"] if category_rows else "—" }}</div></div>
+  </section>
+  <section class="columns">
+    <div class="card">
+      <h2>➕ Add an expense</h2>
+      <form method="post">
+        <label for="title">Description</label>
+        <input id="title" name="title" placeholder="e.g. Lunch, bus ticket" maxlength="100" required>
+        <label for="amount">Amount (₹)</label>
+        <input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="e.g. 150" required>
+        <label for="category">Category</label>
+        <select id="category" name="category">
+          <option>Food</option><option>Travel</option><option>Shopping</option><option>Education</option><option>Bills</option><option>Other</option>
+        </select>
+        <label for="expense_date">Date</label>
+        <input id="expense_date" name="expense_date" type="date" value="{{ today }}" required>
+        <button class="primary" type="submit">Save Expense</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>📊 Recent expenses</h2>
+      {% if expenses %}
+        {% for expense in expenses %}
+        <div class="expense">
+          <div>
+            <div class="expense-title">{{ expense["title"] }}</div>
+            <div class="meta">{{ expense["expense_date"] }} · <span class="pill">{{ expense["category"] }}</span></div>
+          </div>
+          <div class="right">
+            <span class="amount">₹{{ "%.2f"|format(expense["amount"]) }}</span>
+            <form method="post" action="{{ url_for('delete_expense', expense_id=expense['id']) }}" onsubmit="return confirm('Delete this expense?')">
+              <button class="delete" type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No expenses yet. Add your first expense on the left.</div>
+      {% endif %}
+    </div>
+  </section>
+  <section class="card" style="margin-top:18px">
+    <h2>Spending by category</h2>
+    {% if category_rows %}
+      {% for row in category_rows %}
+        <div class="category-row"><span>{{ row["category"] }}</span><strong>₹{{ "%.2f"|format(row["total"]) }}</strong></div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">Category totals will appear after you add expenses.</div>
+    {% endif %}
+  </section>
+</main>
+<footer>Mini Project Prototype · Python Flask · SQLite · HTML/CSS</footer>
+</body>
+</html>
